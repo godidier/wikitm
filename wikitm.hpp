@@ -30,6 +30,7 @@ class wikitm {
 			boost::gregorian::date_duration date_delta, int date_count, 
 			std::string input_folder, std::string output_folder);
 		std::vector<std::string> find_pages(std::string& chunk);
+		std::vector<char*> find_pages(char* chunk, char* trail);
 		boost::gregorian::date get_time(rapidxml::xml_node<> *revision_node);
 		std::vector<std::string> get_latest_revisions(
 				std::vector<boost::gregorian::date> timeline, std::string page_s);

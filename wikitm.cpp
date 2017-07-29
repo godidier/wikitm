@@ -64,6 +64,60 @@ std::vector<std::string> wikitm::find_pages(std::string& chunk){
 }
 
 
+std::vector<char*> wikitm::find_pages(char* chunk, char* trail)
+{
+	std::vector<char*> pages;
+	while(true){
+		bool has_page_start = false;
+		bool has_page_end = false;
+		char* pstart = NULL;
+		char* pend = NULL; 
+		unsigned long page_length = 0;
+
+		pstart = std::strstr( chunk, PAGE_TAG_START );
+		pend = std::strstr( chunk, PAGE_TAG_END ); 
+		if (pstart != NULL){
+			has_page_start = true;
+		}
+		if ( pend != NULL ){
+			has_page_end = true;
+			pend += sizeof(char) * strlen( PAGE_TAG_END );
+		}
+
+		if( has_page_start && has_page_end ){
+			if( pstart < pend){
+				page_length = pend - pstart;
+				char page[page_length];
+				std::strncpy(page, pstart, page_length);
+				page[page_length] = '\0';
+				pages.push_back(page);
+			}
+			else {
+				has_page_end = false;
+			}
+			chunk += pend; 
+		}
+		else if ( !has_page_start && has_page_end ){
+			chunk += pend; 
+			// Actually this condition is not supposed to happened if the xml file is healthy
+		}
+		else if ( has_page_start && !has_page_end ){
+			chunk += pstart;
+			std::strncpy(trail, chunk, std::strlen(chunk));
+			trail[std::strlen(chunk)] = '\0';
+			break;
+		}
+		else if ( !has_page_start && !has_page_end ){
+			// a tag might be stuck between 2 chunks 
+			chunk += std::strlen(chunk) - std::strlen(PAGE_TAG_END);
+			std::strncpy(trail, chunk, std::strlen(chunk));
+			trail[std::strlen(chunk)] = '\0';
+			break;
+		}
+	}
+	return pages;
+}
+
 
 boost::gregorian::date wikitm::get_time(rapidxml::xml_node<> *revision_node){
 	boost::gregorian::date d;
@@ -179,6 +233,7 @@ void wikitm::run(){
 		std::cout << "\t" << m_outfiles[i] << std::endl;
 	}
 	
+	char* chunk = new char[CHUNK_SIZE];
 	for ( int i = 0; i < m_dumpfiles.size(); i++ ){
 		long nb_pages_done = 0; // TODO 
 		std::vector<std::string> pages;
@@ -195,7 +250,6 @@ void wikitm::run(){
 		std::ifstream fin(dumpfilepath.c_str());
 
 		auto t_file_start = std::chrono::system_clock::now();
-		char* chunk = new char[CHUNK_SIZE];
 		while( true ){
 			chunks_read += 1;
 			file_progress = ( (long double)(chunks_read*CHUNK_SIZE)/(long double)dumpfile_size ) * 100  ;
@@ -205,7 +259,7 @@ void wikitm::run(){
 			//std::cout << nb_pages_done << " total pages done" << std::endl; // TODO useless
 			fin.read(chunk, CHUNK_SIZE);
 			if ( !fin ) break ;
-			chunk_str.assign(chunk, CHUNK_SIZE); // TODO check if chunk not NULL
+			chunk_str.assign(chunk, CHUNK_SIZE); // TODO check if chunk not NULL TODO Warning Performance killer 
 			pages = find_pages(chunk_str);
 			prev_chunk = chunk_str; // TODO check if the chunk is getting too big 
 			for ( int i_page = 0; i_page < pages.size(); i_page++ ){
@@ -219,14 +273,14 @@ void wikitm::run(){
 			}
 			nb_pages_done += pages.size();
 		}
-		delete[] chunk;
 		auto t_file_end = std::chrono::system_clock::now();
 		auto d = t_file_end - t_file_start;
 		std::cout << "File " << i+1 << " done in " \
 				<< std::chrono::duration_cast<std::chrono::minutes>(d).count() \
 				<< "minutes"<< std::endl; 
-
 	}
+	delete[] chunk;
+
 }
 
 
